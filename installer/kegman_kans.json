@@ -1,0 +1,20 @@
+{
+  "AutoHold": "1",
+  "CAMERA_SPEED_FACTOR": "0.99",
+  "CruiseDelta": "5",
+  "CruiseEnableMin": "10",
+  "Kf": "0.00004",
+  "Ki": "0.085",
+  "Kp": "0.185",
+  "STOPPING_DISTANCE": "1.5",
+  "battChargeMax": "85",
+  "battChargeMin": "65",
+  "battPercOff": "60",
+  "carVoltageMinEonShutdown": "12000",
+  "deadzone": "0.02",
+  "epsModded": "0",
+  "liveParams": "1",
+  "steerLimitTimer": "3.9",
+  "steerMax": "3.5",
+  "tuneGernby": "1"
+}

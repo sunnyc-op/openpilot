@@ -1,0 +1,7 @@
+{
+  "useLiveSteerRatio": 1,
+  "steerRatio": 17.5,
+  "steerActuatorDelay": 0.1,
+  "steerRateCost": 1.0,
+  "pathOffset": 0.0
+}
