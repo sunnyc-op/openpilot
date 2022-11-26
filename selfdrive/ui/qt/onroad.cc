@@ -76,8 +76,6 @@ void OnroadWindow::updateState(const UIState &s) {
   if (s.sm->updated("controlsState") || !alert.equal({})) {
     if (alert.type == "controlsUnresponsive") {
       bgColor = bg_colors[STATUS_ALERT];
-    } else if (alert.type == "controlsUnresponsivePermanent") {
-      bgColor = bg_colors[STATUS_DISENGAGED];
     }
     if (!Params().getBool("IsOpenpilotViewEnabled")) {
       alerts->updateAlert(alert, bgColor);
@@ -765,40 +763,39 @@ void NvgWindow::drawHud(QPainter &p) {
 
   drawLaneLines(p, s);
 
-  if (s->scene.longitudinal_control) {
-    auto leads = sm["modelV2"].getModelV2().getLeadsV3();
-    if (leads[0].getProb() > .5) {
-      drawLead(p, leads[0], s->scene.lead_vertices[0], s->scene.lead_radar[0]);
-    }
-    if (leads[1].getProb() > .5 && (std::abs(leads[1].getX()[0] - leads[0].getX()[0]) > 3.0)) {
-      drawLead(p, leads[1], s->scene.lead_vertices[1], s->scene.lead_radar[1]);
-    }
+  auto leads = sm["modelV2"].getModelV2().getLeadsV3();
+  if (leads[0].getProb() > .5) {
+    drawLead(p, leads[0], s->scene.lead_vertices[0], s->scene.lead_radar[0]);
   }
+  if (leads[1].getProb() > .5 && (std::abs(leads[1].getX()[0] - leads[0].getX()[0]) > 3.0)) {
+    drawLead(p, leads[1], s->scene.lead_vertices[1], s->scene.lead_radar[1]);
+  }
+
   drawMaxSpeed(p);
   drawSpeed(p);
-  //drawSpeedLimit(p);
-  drawRestArea(p);
   drawGpsStatus(p);
 
-  //if(s->show_debug && width() > 1200)
-  drawDebugText(p);
+  if(s->show_debug && width() > 1200)
+    drawDebugText(p);
 
   const auto controls_state = sm["controlsState"].getControlsState();
-  //const auto live_params = sm["liveParameters"].getLiveParameters();
+  const auto live_params = sm["liveParameters"].getLiveParameters();
 
   // kph
 
   QString infoText;
-  infoText.sprintf("%s(%.2f/%.2f/%.2f/%.0f) TCO(%.2f) SR(%.2f) SAD(%.2f) Curv(%.2f)",
-                      s->lat_control.c_str(),
-                      controls_state.getLatAccelFactor(),
-                      controls_state.getLatAccelOffset(),
-                      controls_state.getFriction(),
-                      controls_state.getTotalBucketPoints(),
-                      controls_state.getTotalCameraOffset(),
-                      controls_state.getSteerRatio(),
-                      controls_state.getSteerActuatorDelay(),
-                      controls_state.getSccCurvatureFactor()
+  infoText.sprintf("%s(%.2f/%.2f/%.2f/%.0f) TCO(%.2f) SR(%.2f) SAD(%.2f) AO(%.2f/%.2f) Curv(%.2f)",
+                        s->lat_control.c_str(),
+                        controls_state.getLatAccelFactor(),
+                        controls_state.getLatAccelOffset(),
+                        controls_state.getFriction(),
+                        controls_state.getTotalBucketPoints(),
+                        controls_state.getTotalCameraOffset(),
+                        controls_state.getSteerRatio(),
+                        controls_state.getSteerActuatorDelay(),
+                        live_params.getAngleOffsetDeg(),
+                        live_params.getAngleOffsetAverageDeg(),
+                        controls_state.getSccCurvatureFactor()
                       );
 
   // info
@@ -905,7 +902,7 @@ void NvgWindow::drawSpeed(QPainter &p) {
   p.restore();
 }
 
-QRect getRect(QPainter &p, int flags, QString text) {
+static QRect getRect(QPainter &p, int flags, QString text) {
   QFontMetrics fm(p.font());
   QRect init_rect = fm.boundingRect(text);
   return fm.boundingRect(init_rect, flags, text);
@@ -1120,90 +1117,6 @@ void NvgWindow::drawMaxSpeed(QPainter &p) {
     }
   }
 
-  p.restore();
-}
-
-
-
-QPixmap NvgWindow::get_icon_iol_com(const char* key) {
-  auto item = ic_oil_com.find(key);
-  if(item == ic_oil_com.end()) {
-    QString str;
-    str.sprintf("../assets/images/oil_com/%s.png", key);
-
-    QPixmap icon = QPixmap(str);
-    ic_oil_com[key] = icon;
-    return icon;
-  }
-  else
-    return item.value();
-}
-
-void NvgWindow::drawRestArea(QPainter &p) {
-  if(width() < 1850)
-    return;
-
-  const SubMaster &sm = *(uiState()->sm);
-  auto roadLimitSpeed = sm["roadLimitSpeed"].getRoadLimitSpeed();
-  auto restAreaList = roadLimitSpeed.getRestArea();
-
-  int length = std::size(restAreaList);
-
-  int yPos = 0;
-  for(int i = length-1; i >= 0; i--) {
-    auto restArea = restAreaList[i];
-    auto image = restArea.getImage();
-    auto title = restArea.getTitle();
-    auto oilPrice = restArea.getOilPrice();
-    auto distance = restArea.getDistance();
-
-    if(title.size() > 0 && distance.size() > 0) {
-      drawRestAreaItem(p, yPos, image, title, oilPrice, distance, i == 0);
-      yPos += 200 + 25;
-    }
-  }
-}
-
-void NvgWindow::drawRestAreaItem(QPainter &p, int yPos, capnp::Text::Reader image, capnp::Text::Reader title,
-        capnp::Text::Reader oilPrice, capnp::Text::Reader distance, bool lastItem) {
-  p.save();
-
-  int mx = 20;
-  int my = 5;
-
-  int box_width = Hardware::TICI() ? 580 : 510;
-  int box_height = 200;
-
-  int icon_size = 70;
-
-  //QRect rc(30, 30, 184, 202); // MAX box
-  QRect rc(184+30+30, 30 + yPos, box_width, box_height);
-  p.setBrush(QColor(0, 0, 0, 100));
-  p.drawRoundedRect(rc, 5, 5);
-
-  if(lastItem)
-    p.setPen(QColor(255, 255, 255, 200));
-  else
-    p.setPen(QColor(255, 255, 255, 150));
-
-  int x = rc.left() + mx;
-  int y = rc.top() + my;
-
-  configFont(p, "Open Sans", 60, "Bold");
-  p.drawText(x, y+60+5, title.cStr());
-
-  QPixmap icon = get_icon_iol_com(image.cStr());
-  p.drawPixmap(x, y + box_height/2 + 5, icon_size, icon_size, icon);
-
-  configFont(p, "Open Sans", 50, "Bold");
-  p.drawText(x + icon_size + 15, y + box_height/2 + 50 + 5, oilPrice.cStr());
-
-  configFont(p, "Open Sans", 60, "Bold");
-
-  QFontMetrics fm(p.font());
-  QRect rect = fm.boundingRect(distance.cStr());
-
-  p.drawText(rc.left()+rc.width()-rect.width()-mx-5, y + box_height/2 + 60, distance.cStr());
   p.restore();
 }
 

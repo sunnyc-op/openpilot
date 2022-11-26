@@ -205,7 +205,7 @@ static void update_state(UIState *s) {
 void ui_update_params(UIState *s) {
   Params params;
   s->scene.is_metric = params.getBool("IsMetric");
-  // s->show_debug = params.getBool("ShowDebugUI");
+  s->show_debug = params.getBool("ShowDebugUI");
   s->lat_control = std::string(Params().get("LateralControl"));
   s->scene.brightness = std::stoi(params.get("OpkrUIBrightness"));
   s->scene.autoScreenOff = std::stoi(params.get("OpkrAutoScreenOff"));

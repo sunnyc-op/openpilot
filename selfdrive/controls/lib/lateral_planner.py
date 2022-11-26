@@ -17,9 +17,9 @@ class LateralPlanner:
     self.LP = LanePlanner(wide_camera)
     self.DH = DesireHelper()
 
+    # Vehicle model parameters used to calculate lateral movement of car
     self.factor1 = CP.wheelbase - CP.centerToFront
     self.factor2 = (CP.centerToFront * CP.mass) / (CP.wheelbase * CP.tireStiffnessRear)
-
     self.last_cloudlog_t = 0
     self.solution_invalid_cnt = 0
 
@@ -98,7 +98,7 @@ class LateralPlanner:
                      heading_pts,
                      np.zeros_like(curv_rate_pts))
     # init state for next
-    # mpc.u_sol is the desired curvature rate given x0 curv state.
+    # mpc.u_sol is the desired curvature rate given x0 curv state. 
     # with x0[3] = measured_curvature, this would be the actual desired rate.
     # instead, interpolate x_sol so that x0[3] is the desired curvature for lat_control.
     # init state for next

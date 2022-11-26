@@ -1,5 +1,12 @@
 from selfdrive.car import make_can_msg
 
+def create_buttons(packer, bus, idx, button):
+  values = {
+    "ACCButtons": button,
+    "RollingCounter": idx,
+  }
+  return packer.make_can_msg("ASCMSteeringButton", bus, values)
+
 def create_steering_control(packer, bus, apply_steer, idx, lkas_active):
 
   values = {
@@ -62,13 +69,13 @@ def create_friction_brake_command(packer, bus, apply_brake, idx, near_stop, at_f
 
   return packer.make_can_msg("EBCMFrictionBrakeCmd", bus, values)
 
-def create_acc_dashboard_command(packer, bus, acc_engaged, target_speed_kph, lead_car_in_sight, fcw, follow_level, res_button):
+def create_acc_dashboard_command(packer, bus, acc_engaged, target_speed_kph, lead_car_in_sight, fcw, follow_level):
   # Not a bit shift, dash can round up based on low 4 bits.
   target_speed = int(target_speed_kph * 16) & 0xfff
 
   values = {
     "ACCAlwaysOne" : 1,
-    "ACCResumeButton" : res_button,
+    "ACCResumeButton" : 0,
     "ACCSpeedSetpoint" : target_speed,
     "ACCGapLevel" : follow_level,
     "ACCCmdActive" : acc_engaged,
@@ -127,9 +134,3 @@ def create_lka_icon_command(bus, active, critical, steer):
   else:
     dat = b"\x00\x00\x00"
   return make_can_msg(0x104c006c, dat, bus)
-
-def create_resume_button_command(packer, bus, button):
-  values = {
-    "ACCButtons": button,
-  }
-  return packer.make_can_msg("ASCMSteeringButton", bus, values)

@@ -82,12 +82,7 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       "Disable default comma stock disengage on gas feature",
       "../assets/offroad/icon_car_pedal.png",
      },
-    {
-      "EnableAutoResume",
-      "Enable auto resume",
-      "Disable default GM stock disable auto resume from full stop",
-      "../assets/offroad/icon_auto_resume.png",
-     },
+
 #ifdef ENABLE_MAPS
     {
       "NavSettingTime24h",
@@ -2030,18 +2025,25 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     toggleLayout->addWidget(new SteerActuatorDelay());
     toggleLayout->addWidget(horizontal_line());
     toggleLayout->addWidget(new SteerLimitTimer());
-
   }
   toggles.append(new ParamControl("DisableOpFcw",
                                             "Disable Openpilot FCW",
                                             "",
                                             "../assets/offroad/icon_shell.png",
                                             this));
+
+  toggles.append(new ParamControl("ShowDebugUI",
+                                            "Show Debug UI",
+                                            "",
+                                            "../assets/offroad/icon_shell.png",
+                                            this));
+
   if (!useNM) toggles.append(new ParamControl("OpkrBatteryChargingControl",
                                             "Enable Battery Charging Control",
                                             "It uses the battery charge control function.",
                                             "../assets/offroad/icon_shell.png",
                                             this));
+
   for(ParamControl *toggle : toggles) {
     if(main_layout->count() != 0) {
       toggleLayout->addWidget(horizontal_line());
@@ -2059,10 +2061,10 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
   toggleLayout->addWidget(new AutoScreenOff());
   toggleLayout->addWidget(horizontal_line());
   toggleLayout->addWidget(new BrightnessOffControl());
-  toggleLayout->addWidget(horizontal_line());
-  toggleLayout->addWidget(new OPKRServerSelect());
-  toggleLayout->addWidget(horizontal_line());
-  toggleLayout->addWidget(new OPKRServerAPI());
+//  toggleLayout->addWidget(horizontal_line());
+//  toggleLayout->addWidget(new OPKRServerSelect());
+//  toggleLayout->addWidget(horizontal_line());
+//  toggleLayout->addWidget(new OPKRServerAPI());
   toggleLayout->addWidget(horizontal_line());
   toggleLayout->addWidget(new TimeZoneSelectCombo());
 }

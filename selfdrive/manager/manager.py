@@ -39,7 +39,6 @@ def manager_init() -> None:
 
   default_params: List[Tuple[str, Union[str, bytes]]] = [
     ("CompletedTrainingVersion", "0"),
-    # ("DisengageOnAccelerator", "0"),
     ("HasAcceptedTerms", "0"),
     ("OpenpilotEnabledToggle", "1"),
     ("IsMetric", "1"),
@@ -48,7 +47,7 @@ def manager_init() -> None:
     ("DisableOpFcw", "1"),
     ("DisableUpdates", "1"),
     ("DisableDisengageOnGas", "0"),
-    ("EnableAutoResume", "0"),
+    ("ShowDebugUI", "0"),
     #OPKR
     ("OpkrBatteryChargingControl", "0"),
     ("OpkrBatteryChargingMin", "70"),
@@ -156,7 +155,7 @@ def manager_cleanup() -> None:
 def manager_thread() -> None:
 
   if EON:
-    # Process(name="autoshutdownd", target=launcher, args=("selfdrive.autoshutdownd", "autoshutdownd")).start()
+    Process(name="autoshutdownd", target=launcher, args=("selfdrive.autoshutdownd", "autoshutdownd")).start()
     system("am startservice com.neokii.optool/.MainService")
 
   Process(name="road_speed_limiter", target=launcher, args=("selfdrive.road_speed_limiter", "road_speed_limiter")).start()
