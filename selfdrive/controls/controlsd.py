@@ -2,6 +2,7 @@
 import os
 import math
 from typing import SupportsFloat
+import random
 
 import numpy as np
 from numbers import Number
@@ -14,7 +15,6 @@ from common.params import Params, put_nonblocking
 import cereal.messaging as messaging
 from common.conversions import Conversions as CV
 from panda import ALTERNATIVE_EXPERIENCE
-from selfdrive.controls.lib.latcontrol_torque import LatControlTorque
 from selfdrive.swaglog import cloudlog
 from selfdrive.boardd.boardd import can_list_to_can_capnp
 from selfdrive.car.car_helpers import get_car, get_startup_event, get_one_can
@@ -26,16 +26,19 @@ from selfdrive.controls.lib.latcontrol_pid import LatControlPID
 from selfdrive.controls.lib.latcontrol_indi import LatControlINDI
 from selfdrive.controls.lib.latcontrol_lqr import LatControlLQR
 from selfdrive.controls.lib.latcontrol_angle import LatControlAngle
+from selfdrive.controls.lib.latcontrol_torque import LatControlTorque
 from selfdrive.controls.lib.events import Events, ET
 from selfdrive.controls.lib.alertmanager import AlertManager, set_offroad_alert
 from selfdrive.controls.lib.vehicle_model import VehicleModel
 from selfdrive.locationd.calibrationd import Calibration
 from selfdrive.hardware import HARDWARE, TICI, EON
 from selfdrive.manager.process_config import managed_processes
+from selfdrive.ntune import ntune_common_get, ntune_common_enabled, ntune_scc_get
+# from selfdrive.road_speed_limiter import get_road_speed_limiter, road_speed_limiter_get_active # road_speed_limiter_get_max_speed
+from selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import AUTO_TR_CRUISE_GAP
 from selfdrive.ntune import ntune_common_get, ntune_common_enabled, ntune_scc_get, ntune_option_enabled, ntune_option_get, ntune_torque_get
 from decimal import Decimal
-from selfdrive.road_speed_limiter import get_road_speed_limiter, road_speed_limiter_get_active # road_speed_limiter_get_max_speed
-from selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import AUTO_TR_CRUISE_GAP
+from selfdrive.road_speed_limiter import SpeedLimiter
 
 SOFT_DISABLE_TIME = 3  # seconds
 LDW_MIN_SPEED = 31 * CV.MPH_TO_MS
@@ -49,7 +52,7 @@ IGNORE_PROCESSES = {"rtshield", "uploader", "deleter", "loggerd", "logmessaged",
                     "statsd", "shutdownd"} | \
                    {k for k, v in managed_processes.items() if not v.enabled}
 
-MIN_CURVE_SPEED = 50. * CV.KPH_TO_MS
+MIN_CURVE_SPEED = 32. * CV.KPH_TO_MS
 
 ThermalStatus = log.DeviceState.ThermalStatus
 State = log.ControlsState.OpenpilotState
@@ -194,6 +197,11 @@ class Controls:
     self.curve_speed_ms = 255.
     self.sccStockCamStatus = 0
     self.sccStockCamAct = 0
+
+    self.slowing_down = False
+    self.slowing_down_alert = False
+    self.slowing_down_sound_alert = False
+
     self.left_lane_visible = False
     self.right_lane_visible = False
 
@@ -235,6 +243,11 @@ class Controls:
     # controlsd is driven by can recv, expected at 100Hz
     self.rk = Ratekeeper(100, print_delay_threshold=None)
     self.prof = Profiler(False)  # off by default
+
+  def reset(self):
+    self.slowing_down = False
+    self.slowing_down_alert = False
+    self.slowing_down_sound_alert = False
 
   def update_events(self, CS):
     """Compute carEvents from carState"""
@@ -435,6 +448,13 @@ class Controls:
       and self.CP.openpilotLongitudinalControl and CS.vEgo < 0.3:
       self.events.add(EventName.noTarget)
 
+    # events for roadSpeedLimiter
+    if self.slowing_down_sound_alert:
+      self.slowing_down_sound_alert = False
+      self.events.add(EventName.slowingDownSpeedSound)
+    elif self.slowing_down_alert:
+      self.events.add(EventName.slowingDownSpeed)
+
   def data_sample(self):
     """Receive data from sockets and update carState"""
 
@@ -491,11 +511,11 @@ class Controls:
         d2y = np.gradient(dy, x)
         curv = d2y / (1 + dy ** 2) ** 1.5
 
-        start = int(interp(v_ego, [12.5, 35.], [5, TRAJECTORY_SIZE-10]))
+        start = int(interp(v_ego, [10., 27.], [10, TRAJECTORY_SIZE-10]))
         curv = curv[start:min(start + 10, TRAJECTORY_SIZE)]
-        a_y_max = 2.975 - v_ego * 0.0375  # ~1.85 @ 75mph, ~2.6 @ 25mph
+        a_y_max = 2.965 - v_ego * 0.0375  # ~1.85 @ 75mph, ~2.6 @ 25mph
         v_curvature = np.sqrt(a_y_max / np.clip(np.abs(curv), 1e-4, None))
-        model_speed = np.mean(v_curvature) * 0.95 * ntune_scc_get("sccCurvatureFactor")
+        model_speed = np.mean(v_curvature) * 0.85 * ntune_scc_get("sccCurvatureFactor")
 
         if model_speed < v_ego:
           self.curve_speed_ms = float(max(model_speed, MIN_CURVE_SPEED))
@@ -524,17 +544,26 @@ class Controls:
         self.v_cruise_kph = 0
 
 
-    road_speed_limiter = get_road_speed_limiter()
-    apply_limit_speed, road_limit_speed, left_dist, first_started, log = \
-      road_speed_limiter.get_max_speed(CS, self.v_cruise_kph)
+    apply_limit_speed, road_limit_speed, left_dist, first_started, limit_log = \
+      SpeedLimiter.instance().get_max_speed(CS, self.v_cruise_kph)
 
-    if apply_limit_speed > 20:
+    if apply_limit_speed >= 20:
       self.v_cruise_kph_limit = min(apply_limit_speed, self.v_cruise_kph)
 
-      if apply_limit_speed < CS.vEgo * CV.MS_TO_KPH:
-        self.events.add(EventName.slowingDownSpeed)
+      if CS.vEgo * CV.MS_TO_KPH > apply_limit_speed:
+      #  self.events.add(EventName.slowingDownSpeedSound)
+
+        if not self.slowing_down_alert and not self.slowing_down:
+          self.slowing_down_sound_alert = True
+          self.slowing_down = True
+
+        self.slowing_down_alert = True
+
+      else:
+        self.slowing_down_alert = False
 
     else:
+      self.reset()
       self.v_cruise_kph_limit = self.v_cruise_kph
 # 2 lines for Slow on Curve
     curv_speed_ms = self.cal_curve_speed(self.sm, CS.vEgo, self.sm.frame)
@@ -632,7 +661,7 @@ class Controls:
     # Update VehicleModel
     params = self.sm['liveParameters']
     x = max(params.stiffnessFactor, 0.1)
-
+    #sr = max(params.steerRatio, 0.1)
 
     if Params().get_bool("UseNpilotManager"):
       if ntune_common_enabled('useLiveSteerRatio'):
@@ -776,8 +805,8 @@ class Controls:
         left_deviation = steering_value > 0 and dpath_points[0] < -0.20
         right_deviation = steering_value < 0 and dpath_points[0] > 0.20
 
-        if left_deviation or right_deviation:
-          self.events.add(EventName.steerSaturated)
+        #if left_deviation or right_deviation:
+        #  self.events.add(EventName.steerSaturated)
 
     # Ensure no NaNs/Infs
     for p in ACTUATOR_FIELDS:
@@ -926,9 +955,7 @@ class Controls:
     controlsState.sccStockCamAct = self.sccStockCamAct
     controlsState.sccStockCamStatus = self.sccStockCamStatus
 
-    # display SR/SRC/SAD on Ui
     controlsState.steerRatio = float(self.steerRatio_to_send)
-    # controlsState.steerRateCost = ntune_common_get('steerRateCost')
     controlsState.steerActuatorDelay = ntune_common_get('steerActuatorDelay') if Params().get_bool("UseNpilotManager") else float(Decimal(Params().get("SteerActuatorDelayAdj", encoding="utf8")) * Decimal('0.01'))
 
     controlsState.sccGasFactor = ntune_scc_get('sccGasFactor')
