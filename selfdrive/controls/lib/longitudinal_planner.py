@@ -17,12 +17,12 @@ from selfdrive.swaglog import cloudlog
 LON_MPC_STEP = 0.2  # first step(0.2s)
 AWARENESS_DECEL = -0.2     # car smoothly decel at .2m/s^2 when user is distracted
 A_CRUISE_MIN = -1.2
-A_CRUISE_MAX_VALS = [2.4, 2.1, 0.8, 0.55]
+A_CRUISE_MAX_VALS = [1.5, 1.2, 0.7, 0.45]
 A_CRUISE_MAX_BP = [-0.1, 13.9, 19.4, 33.]
 
-# Lookup table for turns
-_A_TOTAL_MAX_V = [1.7, 3.2]
-_A_TOTAL_MAX_BP = [20., 40.]
+# Lookup table for turns - fast accel from Twilsonco
+_A_TOTAL_MAX_V = [3.5, 4.0, 5.0]
+_A_TOTAL_MAX_BP = [0., 25., 55.]
 
 
 def get_max_accel(v_ego):
@@ -36,8 +36,8 @@ def limit_accel_in_turns(v_ego, angle_steers, a_target, CP):
   """
 
   a_total_max = interp(v_ego, _A_TOTAL_MAX_BP, _A_TOTAL_MAX_V)
-  a_y = v_ego ** 2 * angle_steers * CV.DEG_TO_RAD / (CP.steerRatio * CP.wheelbase)
-  a_x_allowed = math.sqrt(max(a_total_max ** 2 - a_y ** 2, 0.))
+  a_y = v_ego**2 * angle_steers * CV.DEG_TO_RAD / (CP.steerRatio * CP.wheelbase)
+  a_x_allowed = math.sqrt(max(a_total_max**2 - a_y**2, 0.))
 
   return [a_target[0], min(a_target[1], a_x_allowed)]
 
@@ -101,7 +101,7 @@ class Planner:
     self.j_desired_trajectory = np.interp(T_IDXS[:CONTROL_N], T_IDXS_MPC[:-1], self.mpc.j_solution)
 
     # TODO counter is only needed because radar is glitchy, remove once radar is gone
-    self.fcw = self.mpc.crash_cnt > 5
+    self.fcw = self.mpc.crash_cnt > 5 and not sm['carState'].standstill
     if self.fcw:
       cloudlog.info("FCW triggered")
 

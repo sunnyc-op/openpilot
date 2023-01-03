@@ -19,8 +19,6 @@ class CarState(CarStateBase):
 
     self.cruise_buttons = False
     self.prev_cruise_buttons = False
-    self.resume_button_pressed = False
-    self.auto_resume = Params().get_bool("EnableAutoResume")
     self.vEgo = 0
 
 #3Bar Distance
@@ -45,7 +43,6 @@ class CarState(CarStateBase):
 
     self.pause_long_on_gas_press = False
     self.gasPressed = False
-    self.cruise_resume = False
 
   def update(self, pt_cp, loopback_cp, ch_cp): # line for brake light & GM: EPS fault workaround (#22404)
     ret = car.CarState.new_message()
@@ -130,13 +127,7 @@ class CarState(CarStateBase):
       ret.brakePressed = ret.brakePressed or self.regenPaddlePressed
 
     ret.cruiseState.enabled = self.pcm_acc_status != AccState.OFF
-    if self.auto_resume:
-      ret.cruiseState.standstill = self.pcm_acc_status == AccState.STANDSTILL
-    else:
-      ret.cruiseState.standstill = False
-
-    self.resume_button_pressed = bool(pt_cp.vl["ASCMActiveCruiseControlStatus"]["ACCResumeButton"])
-    ret.cruiseState.resumeButton = self.resume_button_pressed
+    ret.cruiseState.standstill = False
 
     #Cruise Gap
     ret.cruiseGap = self.follow_level
@@ -199,9 +190,6 @@ class CarState(CarStateBase):
       ("BrakePedalPos", "ECMAcceleratorPos"),
       ("ACCGapLevel", "ASCMActiveCruiseControlStatus"),
       ("ACCSpeedSetpoint", "ASCMActiveCruiseControlStatus"),
-      ("ACCResumeButton", "ASCMActiveCruiseControlStatus"),
-      ("GAS_COMMAND", "GAS_COMMAND"),
-      ("GAS_COMMAND2", "GAS_COMMAND"),
     ]
 
     checks = []

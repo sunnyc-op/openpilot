@@ -270,18 +270,6 @@ class nTune():
   def checkValidOption(self):
     updated = False
 
-    if self.checkValue("autoEnable", 0., 1., 0.):
-      updated = True
-
-    if self.checkValue("autoEnableSpeed", 0., 60., 15.):
-      updated = True
-
-    if self.checkValue("autoCruiseSet", 0., 1., 0.):
-      updated = True
-
-    if self.checkValue("autoCruiseSetDependsOnNda", 0., 1., 0.):
-      updated = True
-
     if self.checkValue("batteryChargingControl", 0., 1., 0.):
       updated = True
 
@@ -322,7 +310,6 @@ class nTune():
       lqr.reset()
 
   def read_cp(self):
-
     try:
       if self.CP is not None:
 

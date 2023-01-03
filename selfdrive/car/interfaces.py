@@ -41,7 +41,6 @@ class CarInterfaceBase(ABC):
     self.low_speed_alert = False
     self.silent_steer_warning = True
     self.disengage_on_gas = not Params().get_bool("DisableDisengageOnGas")
-    self.enable_auto_resume = Params().get_bool("EnableAutoResume")
 
     self.CS = None
     self.can_parsers = []
@@ -249,7 +248,7 @@ class CarInterfaceBase(ABC):
       events.add(EventName.pedalPressed)
 
     # we engage when pcm is active (rising edge)
-    if pcm_enable or not self.enable_auto_resume:
+    if pcm_enable:
       if cs_out.cruiseState.enabled and not self.CS.out.cruiseState.enabled:
         events.add(EventName.pcmEnable)
       elif not cs_out.cruiseState.enabled:

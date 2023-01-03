@@ -13,8 +13,7 @@ from selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX, V_CRUISE_MIN, V_C
 from selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import AUTO_TR_CRUISE_GAP
 
 from selfdrive.ntune import ntune_scc_get
-from selfdrive.road_speed_limiter import road_speed_limiter_get_max_speed, road_speed_limiter_get_active, \
-  get_road_speed_limiter
+from selfdrive.road_speed_limiter import SpeedLimiter
 
 SYNC_MARGIN = 3.
 CREEP_SPEED = 2.3
@@ -144,7 +143,7 @@ class SccSmoother(SingletonInstance):
 
     road_speed_limiter = get_road_speed_limiter()
     apply_limit_speed, road_limit_speed, left_dist, first_started, max_speed_log = \
-      road_speed_limiter.get_max_speed(clu11_speed, self.is_metric)
+      SpeedLimiter.instance().get_max_speed(clu11_speed, self.is_metric)
 
     curv_limit = 0
     self.cal_curve_speed(sm, CS.out.vEgo, frame)

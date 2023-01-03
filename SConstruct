@@ -150,8 +150,9 @@ else:
       "/usr/local/lib",
     ]
 
+  if arch != "jarch64":
+    rpath += [Dir("#third_party/snpe/x86_64-linux-clang").abspath]
   rpath += [
-    Dir("#third_party/snpe/x86_64-linux-clang").abspath,
     Dir("#cereal").abspath,
     Dir("#selfdrive/common").abspath
   ]
@@ -322,7 +323,7 @@ else:
   qt_dirs += [f"/usr/include/{real_arch}-linux-gnu/qt5/Qt{m}" for m in qt_modules]
 
   qt_libs = [f"Qt5{m}" for m in qt_modules]
-  if arch == "larch64":
+  if arch == "larch64" or arch == "jarch64":
     qt_libs += ["GLESv2", "wayland-client"]
   elif arch != "Darwin":
     qt_libs += ["GL"]

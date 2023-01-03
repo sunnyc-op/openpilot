@@ -13,7 +13,7 @@ from opendbc.can.packer import CANPacker
 from common.conversions import Conversions as CV
 from common.params import Params
 from selfdrive.controls.lib.longcontrol import LongCtrlState
-from selfdrive.road_speed_limiter import road_speed_limiter_get_active
+from selfdrive.road_speed_limiter import SpeedLimiter
 
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 min_set_speed = 30 * CV.KPH_TO_MS

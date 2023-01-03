@@ -12,11 +12,17 @@ from selfdrive.car.interfaces import CarInterfaceBase
 from common.params import Params
 from decimal import Decimal
 from selfdrive.ntune import ntune_common_get, ntune_lqr_get, ntune_torque_get
-from selfdrive.kegman_kans_conf import kegman_kans_conf
 
 GearShifter = car.CarState.GearShifter
-ButtonType = car.CarState.ButtonEvent.Type
 EventName = car.CarEvent.EventName
+ButtonType = car.CarState.ButtonEvent.Type
+
+
+# meant for traditional ff fits
+def get_steer_feedforward_sigmoid1(angle, speed, ANGLE_COEF, ANGLE_COEF2, ANGLE_OFFSET, SPEED_OFFSET, SIGMOID_COEF_RIGHT, SIGMOID_COEF_LEFT, SPEED_COEF):
+  x = ANGLE_COEF * (angle) / max(0.01,speed)
+  sigmoid = x / (1. + fabs(x))
+  return ((SIGMOID_COEF_RIGHT if angle > 0. else SIGMOID_COEF_LEFT) * sigmoid) * (0.01 + speed + SPEED_OFFSET) ** ANGLE_COEF2 + ANGLE_OFFSET * (angle * SPEED_COEF - atan(angle * SPEED_COEF))
 
 class CarInterface(CarInterfaceBase):
   def __init__(self, CP, CarController, CarState):
@@ -35,9 +41,14 @@ class CarInterface(CarInterfaceBase):
   # Determined by iteratively plotting and minimizing error for f(angle, speed) = steer.
   @staticmethod
   def get_steer_feedforward_volt(desired_angle, v_ego):
-    desired_angle *= 0.02904609
-    sigmoid = desired_angle / (1 + fabs(desired_angle))
-    return 0.10006696 * sigmoid * (v_ego + 3.12485927)
+    ANGLE_COEF = 0.08617848
+    ANGLE_COEF2 = 0.21
+    ANGLE_OFFSET = 0.00205026
+    SPEED_OFFSET = -3.48009247
+    SIGMOID_COEF_RIGHT = 0.56664089
+    SIGMOID_COEF_LEFT = 0.50360594
+    SPEED_COEF = 0.55322718
+    return get_steer_feedforward_sigmoid1(desired_angle, v_ego, ANGLE_COEF, ANGLE_COEF2, ANGLE_OFFSET, SPEED_OFFSET, SIGMOID_COEF_RIGHT, SIGMOID_COEF_LEFT, SPEED_COEF)
 
   @staticmethod
   def get_steer_feedforward_acadia(desired_angle, v_ego):
@@ -54,7 +65,7 @@ class CarInterface(CarInterfaceBase):
       return CarInterfaceBase.get_steer_feedforward_default
 
   @staticmethod
-  def get_params(candidate, fingerprint=gen_empty_fingerprint(), car_fw=[], disable_radar=False):
+  def get_params(candidate, fingerprint=gen_empty_fingerprint(), car_fw=None, disable_radar=False):
     ret = CarInterfaceBase.get_std_params(candidate, fingerprint)
     ret.carName = "gm"
     ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.gm)]
@@ -70,10 +81,9 @@ class CarInterface(CarInterfaceBase):
     # or camera is on powertrain bus (LKA cars without ACC).
     # for white panda
     # ret.enableGasInterceptor = 0x201 in fingerprint[0]
-    ret.enableGasInterceptor = 512 in fingerprint[0] # Params().get_bool("EnableAutoResume") or (512 in fingerprint[0])
+    ret.enableGasInterceptor = 512 in fingerprint[0]
     ret.enableCamera = is_ecu_disconnected(fingerprint[0], FINGERPRINTS, ECU_FINGERPRINT, candidate, Ecu.fwdCamera)
     ret.openpilotLongitudinalControl = (Params().get_bool('LongControlEnabled') and ret.enableCamera) or ret.enableGasInterceptor
-    ret.autoResume = Params().get_bool("EnableAutoResume")
 
     tire_stiffness_factor = 0.469
     # for autohold on ui icon
@@ -84,6 +94,9 @@ class CarInterface(CarInterfaceBase):
     ret.minEnableSpeed = -1
     ret.mass = 1607. + STD_CARGO_KG
     ret.wheelbase = 2.69
+    ret.steerRatio = 17.7
+    # ret.steerRateCost = 0.23
+    ret.steerActuatorDelay = 0.225  # Default delay, not measured yet
     ret.steerRatioRear = 0.
     ret.centerToFront = ret.wheelbase * 0.49 # wild guess
 
@@ -122,14 +135,9 @@ class CarInterface(CarInterfaceBase):
         # D gain
         ret.lateralTuning.pid.kdBP = [0., 15., 33.]
         ret.lateralTuning.pid.kdV = [0.49, 0.65, 0.725]  #corolla from shane fork : 0.725
+
     elif lateral_control == 'TORQUE':
       ret.lateralTuning.init('torque')
-
-    ret.steerRatio = 17.7
-
-    ret.steerActuatorDelay = 0.1  # Default delay
-    ret.steerLimitTimer = 0.4 # Default
-
     params = Params()
     if params.get_bool("UseNpilotManager"):
       ret.steerActuatorDelay = max(ntune_common_get('steerActuatorDelay'), 0.1)
@@ -137,6 +145,9 @@ class CarInterface(CarInterfaceBase):
     else:
       ret.steerActuatorDelay = float(Decimal(params.get("SteerActuatorDelayAdj", encoding="utf8")) * Decimal('0.01'))
       ret.steerLimitTimer = float(Decimal(params.get("SteerLimitTimerAdj", encoding="utf8")) * Decimal('0.01'))
+
+
+
 
     if params.get_bool("UseNpilotManager"):
       ret.steerRatio = max(ntune_common_get('steerRatio'), 12.0)
@@ -160,7 +171,7 @@ class CarInterface(CarInterfaceBase):
 
         if params.get_bool("UseBaseTorqueValues"):
           try:
-            torque_params = CarInterfaceBase.get_torque_params(candidate) #auto pulling selfdrive/car/torque_data 
+            torque_params = CarInterfaceBase.get_torque_params(candidate) #selfdrive/car/torque_data 자동으로 가져오기
             torque_lat_accel_factor = torque_params['LAT_ACCEL_FACTOR']
             torque_friction = torque_params['FRICTION']
           except:
@@ -186,17 +197,19 @@ class CarInterface(CarInterfaceBase):
     ret.longitudinalTuning.deadzoneBP = [0., 100.*CV.KPH_TO_MS]
     ret.longitudinalTuning.deadzoneV = [0.0, .14]
 
-    ret.longitudinalTuning.kpBP = [0, 10 * CV.KPH_TO_MS, 20 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS, 70 * CV.KPH_TO_MS, 120 * CV.KPH_TO_MS]
-    ret.longitudinalTuning.kpV = [4.8, 3.5, 3.0, 1.0, 0.7, 0.5]
+    #ret.longitudinalTuning.kpBP = [0, 10 * CV.KPH_TO_MS, 20 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS, 70 * CV.KPH_TO_MS, 120 * CV.KPH_TO_MS]
+    #ret.longitudinalTuning.kpV = [4.8, 3.5, 3.0, 1.0, 0.7, 0.5]
+    ret.longitudinalTuning.kpBP = [5., 15., 35.] # twilsonco
+    ret.longitudinalTuning.kpV = [0.9, 0.9, 0.8] #twilsonco
     ret.longitudinalTuning.kiBP = [0, 20 * CV.KPH_TO_MS, 30 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS, 70 * CV.KPH_TO_MS, 120 * CV.KPH_TO_MS]
     ret.longitudinalTuning.kiV = [0.35, 0.53, 0.62, 0.7, 0.5, 0.36]
-    ret.longitudinalActuatorDelayLowerBound = 0.2
-    ret.longitudinalActuatorDelayUpperBound = 0.2
+    ret.longitudinalActuatorDelayLowerBound = 0.42
+    ret.longitudinalActuatorDelayUpperBound = 0.42
     ret.stopAccel = -1.7
     ret.stoppingDecelRate = 3.8
     ret.vEgoStopping = 0.36
     ret.vEgoStarting = 0.35
-    ret.radarTimeStep = 0.0667  # GM radar runs at 15Hz instead of standard 20Hz
+    ret.radarTimeStep = 1/15  # GM radar runs at 15Hz instead of standard 20Hz
 
     return ret
 
