@@ -144,6 +144,12 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     modelLagWarningDEPRECATED @93;
     startupOneplusDEPRECATED @82;
     startupFuzzyFingerprintDEPRECATED @97;
+    #sunny
+    visionEntering @118;
+    visionTurning @119;
+    visionleaving @120;
+    curvespeedValueChange @117;
+    chimeAtResume @121;
   }
 }
 
@@ -209,7 +215,7 @@ struct CarState {
   # clutch (manual transmission only)
   clutchPressed @28 :Bool;
 
-  #Kegman 3Bar Distance Profile
+  # 3Bar Distance Profile
   cruiseGap @37 :Float32;
   lkMode @38 :Bool;
   engineRPM @39 :Float32;
@@ -223,6 +229,8 @@ struct CarState {
   # blindspot sensors
   leftBlindspot @33 :Bool; # Is there something blocking the left lane change
   rightBlindspot @34 :Bool; # Is there something blocking the right lane change
+  cluSpeedMs @45 :Float32;
+  vCluRatio @46 :Float32;
 
   struct WheelSpeeds {
     # optional wheel speeds
@@ -235,11 +243,14 @@ struct CarState {
   struct CruiseState {
     enabled @0 :Bool;
     speed @1 :Float32;
+    speedCluster @6 :Float32;  # Set speed as shown on instrument cluster
     available @2 :Bool;
     speedOffset @3 :Float32;
     standstill @4 :Bool;
     nonAdaptive @5 :Bool;
-    resumeButton @6 :Bool;
+    speedLimit @7 :Float32;
+    enabledAcc @8 :Bool;
+    resumeButton @9: Bool;
   }
 
   enum GearShifter {
@@ -372,7 +383,7 @@ struct CarControl {
     override @1: Bool;
     speedOverride @2: Float32;
     accelOverride @3: Float32;
-    accResumeButton @4: Bool;
+    resume @4: Bool;
   }
 
   struct HUDControl {
@@ -419,6 +430,7 @@ struct CarControl {
 
       slowingDownSpeed @9;
       autoHoldOn @10;
+      dingdong @11;
     }
   }
 
@@ -457,6 +469,7 @@ struct CarParams {
   alternativeExperience @66 :Int16;  # panda flag for features like no disengage on gas
   unsafeMode @68 :Int16;
   maxLateralAccel @73 :Float32;
+  autoResumeSng @74 :Bool;               # describes whether car can resume from a stop automatically
 
   steerMaxBPDEPRECATED @11 :List(Float32);
   steerMaxVDEPRECATED @12 :List(Float32);

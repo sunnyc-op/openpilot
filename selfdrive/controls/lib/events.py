@@ -266,6 +266,15 @@ def joystick_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool, sof
   return NormalPermanentAlert("Joystick Mode", vals)
 
 
+def curve_speed_adjust_alert(CP: car.CarParams, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
+  speedLimit = sm['longitudinalPlan'].visionTurnSpeed
+  speed = round(speedLimit * (CV.MS_TO_KPH if metric else CV.MS_TO_MPH))
+  message = f'Adjusting to {speed} {"km/h" if metric else "mph"} curve speed'
+  return Alert(
+    message,
+    "",
+    AlertStatus.normal, AlertSize.small,
+    Priority.LOW, VisualAlert.none, AudibleAlert.none, 4.)    
 
 EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
   # ********** events with no alerts **********
@@ -520,6 +529,33 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
     # ET.PERMANENT: NormalPermanentAlert("Sensor Malfunction", "Contact Support"),
   },
 
+  EventName.visionEntering: {
+    ET.WARNING: Alert(
+      "Curve Entering",
+      "",
+      AlertStatus.normal, AlertSize.small,
+      Priority.LOW, VisualAlert.none, AudibleAlert.none, 2.),
+  },
+
+    EventName.visionTurning: {
+    ET.WARNING: Alert(
+      "Curve Turning",
+      "",
+      AlertStatus.normal, AlertSize.small,
+      Priority.LOW, VisualAlert.none, AudibleAlert.none, 2.),
+  },
+
+  EventName.visionleaving: {
+    ET.WARNING: Alert(
+      "Curve Leaving",
+      "",
+      AlertStatus.normal, AlertSize.small,
+      Priority.LOW, VisualAlert.none, AudibleAlert.none, 2.),
+  },
+
+  EventName.curvespeedValueChange: {
+    ET.WARNING: curve_speed_adjust_alert,
+  },
   # ********** events that affect controls state transitions **********
 
   EventName.pcmEnable: {
@@ -889,5 +925,12 @@ EVENTS: Dict[int, Dict[str, Union[Alert, AlertCallbackType]]] = {
       "",
       AlertStatus.normal, AlertSize.small,
       Priority.MID, VisualAlert.none, AudibleAlert.slowingDownSpeed, 2.),
+  },
+  EventName.chimeAtResume: {
+    ET.WARNING: Alert(
+      "Chime for Depart",
+      "",
+      AlertStatus.normal, AlertSize.small,
+      Priority.LOW, VisualAlert.none, AudibleAlert.dingdong, 3.),
   },
 }

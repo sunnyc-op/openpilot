@@ -175,10 +175,10 @@ class nTune():
     if self.checkValue("useLiveSteerRatio", 0., 1., 1.):
       updated = True
 
-    if self.checkValue("steerRatio", 10.0, 20.0, 17.7):
+    if self.checkValue("steerRatio", 10.0, 20.0, 16.5):
       updated = True
 
-    if self.checkValue("steerActuatorDelay", 0., 0.8, 0.1):
+    if self.checkValue("steerActuatorDelay", 0., 0.8, 0.22):
       updated = True
 
     if self.checkValue("cameraOffset", -2.0, 2.0, -0.06):
@@ -187,7 +187,7 @@ class nTune():
     if self.checkValue("pathOffset", -1.0, 1.0, 0.0):
       updated = True
 
-    if self.checkValue("steerLimitTimer", 0.1, 3.0, 0.4):
+    if self.checkValue("steerLimitTimer", 0.1, 3.0, 0.6):
       updated = True
 
     if self.checkValue("steerRatioScale", 0.0, 0.3, 0.01):
@@ -196,13 +196,13 @@ class nTune():
     if self.checkValue("steerRateCost", 0.1, 1.5, 1.0):
       updated = True
       
-    if self.checkValue("closeToRoadEdge", 0., 1., 0.):
+    if self.checkValue("closeToRoadEdge", 0., 1., 1.):
       updated = True
 
-    if self.checkValue("leftEdgeOffset", -2., 2., 0.15):
+    if self.checkValue("leftEdgeOffset", -2., 2., 0.2):
       updated = True
 
-    if self.checkValue("rightEdgeOffset", -2., 2., -0.15):
+    if self.checkValue("rightEdgeOffset", -2., 2., -0.17):
       updated = True
 
     return updated
@@ -228,7 +228,7 @@ class nTune():
       updated = True
     if self.checkValue("useSteeringAngle", 0., 1., 1.):
       updated = True
-    if self.checkValue("latAccelFactor", 0.5, 4.5, 3.0):
+    if self.checkValue("latAccelFactor", 0.5, 4.5, 2.5):
       updated = True
     if self.checkValue("friction", 0.0, 0.2, 0.1):
       updated = True
@@ -248,7 +248,34 @@ class nTune():
     if self.checkValue("sccBrakeFactor", 0.5, 1.5, 1.0):
       updated = True
 
-    if self.checkValue("sccCurvatureFactor", 0.5, 1.5, 0.96):
+    if self.checkValue("sccCurvatureFactor", 0.5, 1.5, 0.92):
+      updated = True
+
+    if self.checkValue("stoppingDecelRate", 0.4, 3.0, 3.0):
+      updated = True
+
+    if self.checkValue("vEgoStopping", 0.4, 1.0, 0.3):
+      updated = True
+
+    if self.checkValue("vEgoStarting", 0.4, 1.0, 0.25):
+      updated = True
+
+    if self.checkValue("stopAccel", -3.0, -2.0, -2.0):
+      updated = True
+
+    if self.checkValue("STOP_DISTANCE", 4.5, 7.0, 6.0):
+      updated = True
+
+    if self.checkValue("COMFORT_BRAKE", 2.0, 3.0, 2.5):
+      updated = True
+
+    if self.checkValue("StopAtStopSign", 0., 1., 1.):
+      updated = True
+
+    if self.checkValue("TrafficStopDistanceAdjust", 0., 10., 1.5):
+      updated = True
+
+    if self.checkValue("X_EGO_OBSTACLE_COST", 3.0, 8.0, 8.0):
       updated = True
 
     return updated
@@ -270,7 +297,7 @@ class nTune():
   def checkValidOption(self):
     updated = False
 
-    if self.checkValue("batteryChargingControl", 0., 1., 0.):
+    if self.checkValue("batteryChargingControl", 0., 1., 1.):
       updated = True
 
     if self.checkValue("batteryChargingMin", 0., 100., 70.):
@@ -386,6 +413,9 @@ def ntune_common_enabled(key):
 
 def ntune_scc_get(key):
   return ntune_get("scc", key)
+
+def ntune_scc_enabled(key):
+  return ntune_scc_get(key) > 0.5  
 
 def ntune_option_get(key):
    return ntune_get("option", key)

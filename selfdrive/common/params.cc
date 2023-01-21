@@ -184,11 +184,12 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"Offroad_UnofficialHardware", CLEAR_ON_MANAGER_START},
     {"Offroad_UpdateFailed", CLEAR_ON_MANAGER_START},
     {"LateralControl", PERSISTENT},
+    {"UseClusterSpeed", PERSISTENT},
     {"LongControlEnabled", PERSISTENT},
     {"DisableOpFcw", PERSISTENT},
     {"ShowDebugUI", PERSISTENT},
     {"SoftRestartTriggered", CLEAR_ON_MANAGER_START},
-  
+
     //OPKR
     {"OpkrBatteryChargingControl", PERSISTENT},
     {"OpkrBatteryChargingMin", PERSISTENT},
@@ -217,10 +218,15 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"OPKRServerAPI", PERSISTENT},
     {"OPKRTimeZone", PERSISTENT},
     {"UseBaseTorqueValues", PERSISTENT},
+    {"StopAtStopSign", PERSISTENT},
+    {"DepartChimeAtResume", PERSISTENT},
 
     //npilot_manager
     {"UseNpilotManager", PERSISTENT},
 
+    //sunny Speed Control
+    {"TurnVisionControl", PERSISTENT},
+    {"ShowTrafficSignal", PERSISTENT},
 
 };
 

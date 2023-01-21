@@ -566,6 +566,8 @@ void NvgWindow::initializeGL() {
   ic_nda = QPixmap("../assets/images/img_nda.png");
   ic_hda = QPixmap("../assets/images/img_hda.png");
   ic_satellite = QPixmap("../assets/images/satellite.png");
+  ic_trafficLight_green = QPixmap("../assets/images/img_trafficLight_green.png");
+  ic_trafficLight_red = QPixmap("../assets/images/img_trafficLight_red.png");
 }
 
 void NvgWindow::updateFrameMat(int w, int h) {
@@ -644,6 +646,8 @@ void NvgWindow::drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV
   const float d_rel = lead_data.getX()[0];
   const float v_rel = lead_data.getV()[0];
 
+  painter.save();
+
   float fillAlpha = 0;
   if (d_rel < leadBuff) {
     fillAlpha = 255 * (1.0 - (d_rel / leadBuff));
@@ -668,6 +672,48 @@ void NvgWindow::drawLead(QPainter &painter, const cereal::ModelDataV2::LeadDataV
   QPointF chevron[] = {{x + (sz * 1.25), y + sz}, {x, y}, {x - (sz * 1.25), y + sz}};
   painter.setBrush(redColor(fillAlpha));
   painter.drawPolygon(chevron, std::size(chevron));
+
+  UIState* s = uiState();
+  SubMaster& sm = *(s->sm);
+  auto lead_radar = sm["radarState"].getRadarState().getLeadOne();
+  auto lead_one = sm["modelV2"].getModelV2().getLeadsV3()[0];
+  bool radar_detected = lead_radar.getStatus() && lead_radar.getRadar();
+  float radar_dist = radar_detected ? lead_radar.getDRel() : 0;
+  float vision_dist = lead_one.getProb() > .5 ? (lead_one.getX()[0] - 0) : 0;
+  float m_cur_speed = std::max(0.0, sm["carState"].getCarState().getCluSpeedMs() * (s->scene.is_metric ? MS_TO_KPH : MS_TO_MPH));
+
+  QString str;
+  str.sprintf("%.1fm", radar_detected ? radar_dist : vision_dist);
+  QColor textColor = QColor(255, 255, 255, 200);
+  configFont(painter, "Inter", 75, "Bold");
+  drawTextWithColor(painter, x, y + sz / 1.5f + 80.0, str, textColor);
+
+  if (radar_detected) {
+      float radar_rel_speed = lead_radar.getVRel();
+      if(s->scene.is_metric)
+        str.sprintf("%.0fkm/h", m_cur_speed + radar_rel_speed * 3.6);
+      else
+        str.sprintf("%.0fmph", (m_cur_speed + radar_rel_speed * 3.6) * KM_TO_MILE);
+
+      if (radar_rel_speed < -0.1) textColor = QColor(255, 0, 255, 200);
+      else if (radar_rel_speed > 0.1) textColor = QColor(0, 255, 0, 200);
+      else textColor = QColor(255, 255, 255, 200);
+      configFont(painter, "Inter", 60, "Bold");
+      drawTextWithColor(painter, x, y + sz / 1.5f - 80.0, str, textColor);
+  }
+
+  painter.restore();
+}
+
+void NvgWindow::drawStopLine(QPainter& painter, const UIState* s, const cereal::ModelDataV2::StopLineData::Reader &stop_line_data, const QPolygonF &vd) {
+    painter.save();
+
+    float prob = stop_line_data.getProb();
+    if (prob < 0.6) prob = 0.6;
+    painter.setBrush(QColor::fromRgbF(1.0, 0.0, 0.0, std::clamp<float>(prob, 0.0, 1.0)));
+    painter.drawPolygon(vd);
+   
+    painter.restore();
 }
 
 void NvgWindow::paintGL() {
@@ -691,8 +737,9 @@ void NvgWindow::paintEvent(QPaintEvent *event) {
   double cur_draw_t = millis_since_boot();
   double dt = cur_draw_t - prev_draw_t;
   double fps = fps_filter.update(1. / dt * 1000);
+  m_fps = fps;
   if (fps < 15) {
-    LOGW("slow frame rate: %.2f fps", fps);
+    //LOGW("slow frame rate: %.2f fps", fps);
   }
   prev_draw_t = cur_draw_t;
 }
@@ -774,6 +821,8 @@ void NvgWindow::drawHud(QPainter &p) {
   drawMaxSpeed(p);
   drawSpeed(p);
   drawGpsStatus(p);
+  if(s->show_signal)
+    drawStoplineSignal(p);
 
   if(s->show_debug && width() > 1200)
     drawDebugText(p);
@@ -799,18 +848,51 @@ void NvgWindow::drawHud(QPainter &p) {
                       );
 
   // info
-
-  p.save();
   configFont(p, "Open Sans", 34, "Regular");
   p.setPen(QColor(0xff, 0xff, 0xff, 200));
   p.drawText(rect().left() + 20, rect().height() - 15, infoText);
-  p.restore();
 
   drawBottomIcons(p);
 }
 
+void NvgWindow::drawStoplineSignal(QPainter &p) {
+  UIState *s = uiState();
+  const SubMaster &sm = *(s->sm);
+
+  auto stop_line = (*s->sm)["modelV2"].getModelV2().getStopLine();
+  if (stop_line.getX() > 3.0) {
+      if (stop_line.getProb() > .1) {
+          drawStopLine(p, s, stop_line, s->scene.stop_line_vertices);
+      }
+  }
+
+  const auto lp = sm["longitudinalPlan"].getLongitudinalPlan();
+
+  int trafficLight = 0;
+  int TRsign_w = 250;
+  int TRsign_h = 140;
+  int TRsign_x = 950 + TRsign_w;
+  int TRsign_y = 50;
+  if (lp.getTrafficState() == 2) {
+      trafficLight = 1;
+      p.setOpacity(0.8);
+      p.drawPixmap(TRsign_x, TRsign_y, TRsign_w, TRsign_h, ic_trafficLight_green);
+  }
+  else if (lp.getTrafficState() == 1) {
+      trafficLight = 2;
+      p.setOpacity(0.8);
+      p.drawPixmap(TRsign_x, TRsign_y, TRsign_w, TRsign_h, ic_trafficLight_red);
+
+      if (stop_line.getX() <= 150) {
+        QString sltext;
+        QColor color = QColor(255, 255, 255, 230);
+        sltext.sprintf( "%d m", (int)(stop_line.getX()));
+        configFont(p, "Open Sans", 66, "Bold");
+        drawTextWithColor(p, TRsign_x + 120, TRsign_y + TRsign_h + 60, sltext, color);
+      }
+  }
+}
 void NvgWindow::drawBottomIcons(QPainter &p) {
-  p.save();
   const SubMaster &sm = *(uiState()->sm);
   UIState *s = uiState();
   auto car_state = sm["carState"].getCarState();
@@ -865,14 +947,13 @@ void NvgWindow::drawBottomIcons(QPainter &p) {
   bg_alpha = autohold_valid ? 0.3f : 0.1f;
   drawIcon(p, x, y, ic_autohold_active,
           QColor(0, 0, 0, (255 * bg_alpha)), img_alpha);
-  p.restore();
+  p.setOpacity(1.);
 }
 
 void NvgWindow::drawSpeed(QPainter &p) {
-  p.save();
   UIState *s = uiState();
   const SubMaster &sm = *(s->sm);
-  float current_speed = std::max(0.0, sm["carState"].getCarState().getVEgo() * (s->scene.is_metric ? MS_TO_KPH : MS_TO_MPH));
+  float current_speed = std::max(0.0, sm["carState"].getCarState().getCluSpeedMs() * (s->scene.is_metric ? MS_TO_KPH : MS_TO_MPH));
   auto car_state = sm["carState"].getCarState();
   float accel = car_state.getAEgo();
 
@@ -898,8 +979,6 @@ void NvgWindow::drawSpeed(QPainter &p) {
 
   configFont(p, "Open Sans", 66, "Regular");
   drawText(p, rect().center().x(), 310, s->scene.is_metric ? "km/h" : "mph", 200);
-
-  p.restore();
 }
 
 static QRect getRect(QPainter &p, int flags, QString text) {
@@ -1120,6 +1199,30 @@ void NvgWindow::drawMaxSpeed(QPainter &p) {
   p.restore();
 }
 
+
+template <class T>
+float interp(float x, std::initializer_list<T> x_list, std::initializer_list<T> y_list, bool extrapolate)
+{
+  std::vector<T> xData(x_list);
+  std::vector<T> yData(y_list);
+  int size = xData.size();
+
+  int i = 0;
+  if(x >= xData[size - 2]) {
+    i = size - 2;
+  }
+  else {
+    while ( x > xData[i+1] ) i++;
+  }
+  T xL = xData[i], yL = yData[i], xR = xData[i+1], yR = yData[i+1];
+  if (!extrapolate) {
+    if ( x < xL ) yR = yL;
+    if ( x > xR ) yL = yR;
+  }
+
+  T dydx = ( yR - yL ) / ( xR - xL );
+  return yL + dydx * ( x - xL );
+}
 void NvgWindow::drawGpsStatus(QPainter &p) {
   const SubMaster &sm = *(uiState()->sm);
   auto gps = sm["gpsLocationExternal"].getGpsLocationExternal();
@@ -1131,7 +1234,6 @@ void NvgWindow::drawGpsStatus(QPainter &p) {
   int h = 100;
   int x = width() - w - 60;
   int y = 50;
-  p.save();
 
   p.setOpacity(0.8);
   p.drawPixmap(x, y, w, h, ic_satellite);
@@ -1146,12 +1248,10 @@ void NvgWindow::drawGpsStatus(QPainter &p) {
   QString str;
   str.sprintf("%.1fm", accuracy);
   p.drawText(rect, Qt::AlignHCenter, str);
-
-  p.restore();
+  p.setOpacity(1.);
 }
 
 void NvgWindow::drawDebugText(QPainter &p) {
-  p.save();
   const SubMaster &sm = *(uiState()->sm);
   QString str, temp;
 
@@ -1191,8 +1291,6 @@ void NvgWindow::drawDebugText(QPainter &p) {
   p.drawText(text_x, y, str);
 
   y += height;
-  p.setPen(QColor(120, 255, 120, 255));
   str.sprintf("Accel: %.3f\n", accel);
   p.drawText(text_x, y, str);
-  p.restore();
 }

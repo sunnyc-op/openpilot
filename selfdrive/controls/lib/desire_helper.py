@@ -5,7 +5,7 @@ from common.conversions import Conversions as CV
 LaneChangeState = log.LateralPlan.LaneChangeState
 LaneChangeDirection = log.LateralPlan.LaneChangeDirection
 
-LANE_CHANGE_SPEED_MIN = 8.3 * CV.MPH_TO_MS
+LANE_CHANGE_SPEED_MIN = 10 * CV.KPH_TO_MS
 LANE_CHANGE_TIME_MAX = 10.
 
 DESIRES = {

@@ -16,9 +16,9 @@ from selfdrive.controls.lib.vehicle_model import ACCELERATION_DUE_TO_GRAVITY
 HISTORY = 5  # secs
 POINTS_PER_BUCKET = 1500
 MIN_POINTS_TOTAL = 4000
-MIN_POINTS_TOTAL_QLOG = 800
+MIN_POINTS_TOTAL_QLOG = 600
 FIT_POINTS_TOTAL = 2000
-FIT_POINTS_TOTAL_QLOG = 800
+FIT_POINTS_TOTAL_QLOG = 600
 MIN_VEL = 15  # m/s
 FRICTION_FACTOR = 1.5  # ~85% of data coverage
 FACTOR_SANITY = 0.3
@@ -63,7 +63,7 @@ class PointBuckets:
     self.buckets = {bounds: NPQueue(maxlen=POINTS_PER_BUCKET, rowsize=3) for bounds in x_bounds}
     self.buckets_min_points = {bounds: min_point for bounds, min_point in zip(x_bounds, min_points)}
     self.min_points_total = min_points_total
-    
+
   def bucket_lengths(self):
     return [len(v) for v in self.buckets.values()]
 
@@ -147,8 +147,11 @@ class TorqueEstimator:
           cloudlog.info("restored torque params from cache")
       except Exception:
         cloudlog.exception("failed to restore cached torque params")
-        params.remove("LiveTorqueCarParams")
-        params.remove("LiveTorqueParameters")
+        try:
+          params.remove("LiveTorqueCarParams")
+          params.remove("LiveTorqueParameters")
+        except:
+          print("torqued remove error.")
 
     self.filtered_params = {}
     for param in initial_params:
@@ -220,6 +223,7 @@ class TorqueEstimator:
     msg.valid = valid
     liveTorqueParameters = msg.liveTorqueParameters
     liveTorqueParameters.version = VERSION
+    #liveTorqueParameters.useParams = self.use_params
 
     if self.filtered_points.is_valid():
       latAccelFactor, latAccelOffset, friction_coeff = self.estimate_params()

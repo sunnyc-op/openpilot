@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from typing import List
 from cereal import car, log
-from math import fabs
+from math import fabs, erf
 
 from common.numpy_fast import interp
 from common.conversions import Conversions as CV
@@ -11,7 +11,10 @@ from selfdrive.car.gm.values import CAR, Ecu, ECU_FINGERPRINT, CruiseButtons, \
 from selfdrive.car.interfaces import CarInterfaceBase
 from common.params import Params
 from decimal import Decimal
-from selfdrive.ntune import ntune_common_get, ntune_lqr_get, ntune_torque_get
+from selfdrive.ntune import ntune_common_get, ntune_lqr_get, ntune_torque_get, ntune_scc_get
+from selfdrive.car.isotp_parallel_query import IsoTpParallelQuery
+from common.log import Loger
+from selfdrive.car.disable_ecu import enable_radar_tracks, disable_ecu
 
 GearShifter = car.CarState.GearShifter
 EventName = car.CarEvent.EventName
@@ -24,6 +27,13 @@ def get_steer_feedforward_sigmoid1(angle, speed, ANGLE_COEF, ANGLE_COEF2, ANGLE_
   sigmoid = x / (1. + fabs(x))
   return ((SIGMOID_COEF_RIGHT if angle > 0. else SIGMOID_COEF_LEFT) * sigmoid) * (0.01 + speed + SPEED_OFFSET) ** ANGLE_COEF2 + ANGLE_OFFSET * (angle * SPEED_COEF - atan(angle * SPEED_COEF))
 
+# meant for torque fits
+def get_steer_feedforward_erf(angle, speed, ANGLE_COEF, ANGLE_COEF2, ANGLE_OFFSET, SPEED_OFFSET, SIGMOID_COEF_RIGHT, SIGMOID_COEF_LEFT, SPEED_COEF):
+  x = ANGLE_COEF * (angle) * (40.23 / (max(0.05,speed + SPEED_OFFSET))**SPEED_COEF)
+  sigmoid = erf(x)
+  return ((SIGMOID_COEF_RIGHT if angle < 0. else SIGMOID_COEF_LEFT) * sigmoid) + ANGLE_COEF2 * angle
+
+
 class CarInterface(CarInterfaceBase):
   def __init__(self, CP, CarController, CarState):
     super().__init__(CP, CarController, CarState)
@@ -35,20 +45,20 @@ class CarInterface(CarInterfaceBase):
 
   @staticmethod
   def get_pid_accel_limits(CP, current_speed, cruise_speed):
-    params = CarControllerParams()
-    return params.ACCEL_MIN, params.ACCEL_MAX
+    _params = CarControllerParams()
+    return _params.ACCEL_MIN, _params.ACCEL_MAX
 
   # Determined by iteratively plotting and minimizing error for f(angle, speed) = steer.
   @staticmethod
-  def get_steer_feedforward_volt(desired_angle, v_ego):
+  def get_steer_feedforward_volt(desired_lateral_accel, v_ego):
     ANGLE_COEF = 0.08617848
-    ANGLE_COEF2 = 0.21
+    ANGLE_COEF2 = 0.12568428
     ANGLE_OFFSET = 0.00205026
     SPEED_OFFSET = -3.48009247
     SIGMOID_COEF_RIGHT = 0.56664089
     SIGMOID_COEF_LEFT = 0.50360594
     SPEED_COEF = 0.55322718
-    return get_steer_feedforward_sigmoid1(desired_angle, v_ego, ANGLE_COEF, ANGLE_COEF2, ANGLE_OFFSET, SPEED_OFFSET, SIGMOID_COEF_RIGHT, SIGMOID_COEF_LEFT, SPEED_COEF)
+    return get_steer_feedforward_erf(desired_lateral_accel, v_ego, ANGLE_COEF, ANGLE_COEF2, ANGLE_OFFSET, SPEED_OFFSET, SIGMOID_COEF_RIGHT, SIGMOID_COEF_LEFT, SPEED_COEF)
 
   @staticmethod
   def get_steer_feedforward_acadia(desired_angle, v_ego):
@@ -69,6 +79,7 @@ class CarInterface(CarInterfaceBase):
     ret = CarInterfaceBase.get_std_params(candidate, fingerprint)
     ret.carName = "gm"
     ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.gm)]
+    ret.autoResumeSng = ret.minEnableSpeed == -1
     ret.pcmCruise = False  # stock cruise control is kept off
 
     # These cars have been put into dashcam only due to both a lack of users and test coverage.
@@ -81,11 +92,12 @@ class CarInterface(CarInterfaceBase):
     # or camera is on powertrain bus (LKA cars without ACC).
     # for white panda
     # ret.enableGasInterceptor = 0x201 in fingerprint[0]
-    ret.enableGasInterceptor = 512 in fingerprint[0]
+    # ret.enableGasInterceptor = 512 in fingerprint[0]
     ret.enableCamera = is_ecu_disconnected(fingerprint[0], FINGERPRINTS, ECU_FINGERPRINT, candidate, Ecu.fwdCamera)
-    ret.openpilotLongitudinalControl = (Params().get_bool('LongControlEnabled') and ret.enableCamera) or ret.enableGasInterceptor
-
+    ret.openpilotLongitudinalControl = Params().get_bool('LongControlEnabled') or ret.enableCamera # or ret.enableGasInterceptor
     tire_stiffness_factor = 0.469
+    ret.maxSteeringAngleDeg = 90.
+
     # for autohold on ui icon
     ret.enableAutoHold = 241 in fingerprint[0]
 
@@ -94,9 +106,8 @@ class CarInterface(CarInterfaceBase):
     ret.minEnableSpeed = -1
     ret.mass = 1607. + STD_CARGO_KG
     ret.wheelbase = 2.69
-    ret.steerRatio = 17.7
-    # ret.steerRateCost = 0.23
-    ret.steerActuatorDelay = 0.225  # Default delay, not measured yet
+    ret.steerRatio = 16.7
+    ret.steerActuatorDelay = 0.22  # Default delay, not measured yet
     ret.steerRatioRear = 0.
     ret.centerToFront = ret.wheelbase * 0.49 # wild guess
 
@@ -132,31 +143,23 @@ class CarInterface(CarInterfaceBase):
         ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0.], [0.]]
         ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.0175], [0.185]]
         ret.lateralTuning.pid.kf = 1. # get_steer_feedforward_volt()
+        ret.maxSteeringAngleDeg = 90.
         # D gain
         ret.lateralTuning.pid.kdBP = [0., 15., 33.]
         ret.lateralTuning.pid.kdV = [0.49, 0.65, 0.725]  #corolla from shane fork : 0.725
 
     elif lateral_control == 'TORQUE':
       ret.lateralTuning.init('torque')
+
     params = Params()
-    if params.get_bool("UseNpilotManager"):
-      ret.steerActuatorDelay = max(ntune_common_get('steerActuatorDelay'), 0.1)
-      ret.steerLimitTimer = max(ntune_common_get('steerLimitTimer'), 3.0)
-    else:
-      ret.steerActuatorDelay = float(Decimal(params.get("SteerActuatorDelayAdj", encoding="utf8")) * Decimal('0.01'))
-      ret.steerLimitTimer = float(Decimal(params.get("SteerLimitTimerAdj", encoding="utf8")) * Decimal('0.01'))
-
-
-
 
     if params.get_bool("UseNpilotManager"):
-      ret.steerRatio = max(ntune_common_get('steerRatio'), 12.0)
+      ret.steerRatio = max(ntune_common_get('steerRatio'), 16.5)
     else:
       if not params.get_bool("UseBaseTorqueValues"):
         ret.steerRatio = float(Decimal(params.get("SteerRatioAdj", encoding="utf8")) * Decimal('0.01'))
 
     if ret.lateralTuning.which() == 'torque':
-
       if params.get_bool("UseNpilotManager"):
         try:
           torque_lat_accel_factor = ntune_torque_get('latAccelFactor') #LAT_ACCEL_FACTOR
@@ -194,21 +197,30 @@ class CarInterface(CarInterfaceBase):
     ret.steerControlType = car.CarParams.SteerControlType.torque
     ret.stoppingControl = True
 
-    ret.longitudinalTuning.deadzoneBP = [0., 100.*CV.KPH_TO_MS]
-    ret.longitudinalTuning.deadzoneV = [0.0, .14]
+    ret.longitudinalTuning.deadzoneBP = [0., 9.]
+    ret.longitudinalTuning.deadzoneV = [0.0, .15]
 
-    #ret.longitudinalTuning.kpBP = [0, 10 * CV.KPH_TO_MS, 20 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS, 70 * CV.KPH_TO_MS, 120 * CV.KPH_TO_MS]
-    #ret.longitudinalTuning.kpV = [4.8, 3.5, 3.0, 1.0, 0.7, 0.5]
-    ret.longitudinalTuning.kpBP = [5., 15., 35.] # twilsonco
-    ret.longitudinalTuning.kpV = [0.9, 0.9, 0.8] #twilsonco
+    ret.longitudinalTuning.kpBP = [0, 10 * CV.KPH_TO_MS, 20 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS, 70 * CV.KPH_TO_MS, 120 * CV.KPH_TO_MS]
+    ret.longitudinalTuning.kpV = [2.4, 1.5, 1., .6, .4, .3]
+    #ret.longitudinalTuning.kpBP = [5., 15., 35.] # twilsonco
+    #ret.longitudinalTuning.kpV = [0.9, 0.9, 0.8] #twilsonco
     ret.longitudinalTuning.kiBP = [0, 20 * CV.KPH_TO_MS, 30 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS, 70 * CV.KPH_TO_MS, 120 * CV.KPH_TO_MS]
     ret.longitudinalTuning.kiV = [0.35, 0.53, 0.62, 0.7, 0.5, 0.36]
-    ret.longitudinalActuatorDelayLowerBound = 0.42
-    ret.longitudinalActuatorDelayUpperBound = 0.42
-    ret.stopAccel = -1.7
-    ret.stoppingDecelRate = 3.8
-    ret.vEgoStopping = 0.36
-    ret.vEgoStarting = 0.35
+    ret.longitudinalActuatorDelayLowerBound = 0.3
+    ret.longitudinalActuatorDelayUpperBound = 0.3
+
+    ret.stopAccel = min(ntune_scc_get('stopAccel'), -2.0)
+    ret.stoppingDecelRate = max(ntune_scc_get('stoppingDecelRate'), 3.0) #0.4  # brake_travel/s while trying to stop
+    ret.vEgoStopping = max(ntune_scc_get('vEgoStopping'), 0.6) #0.5
+    ret.vEgoStarting = max(ntune_scc_get('vEgoStarting'), 0.3) #0.5 # needs to be >= vEgoStopping to avoid state transition oscillation
+
+    if params.get_bool("UseNpilotManager"):
+      ret.steerActuatorDelay = max(ntune_common_get('steerActuatorDelay'), 0.22)
+      ret.steerLimitTimer = max(ntune_common_get('steerLimitTimer'), 3.0)
+    else:
+      ret.steerActuatorDelay = float(Decimal(params.get("SteerActuatorDelayAdj", encoding="utf8")) * Decimal('0.01'))
+      ret.steerLimitTimer = float(Decimal(params.get("SteerLimitTimerAdj", encoding="utf8")) * Decimal('0.01'))
+
     ret.radarTimeStep = 1/15  # GM radar runs at 15Hz instead of standard 20Hz
 
     return ret
@@ -282,6 +294,9 @@ class CarInterface(CarInterfaceBase):
     if self.CS.autoHoldActivated:
       events.add(car.CarEvent.EventName.autoHoldActivated)
 
+    #opkr
+    if self.CC.e2e_standstill:
+      events.add(EventName.chimeAtResume)  
     # handle button presses
     for b in ret.buttonEvents:
       # do enable on both accel(or resume) and decel buttons
@@ -294,10 +309,6 @@ class CarInterface(CarInterfaceBase):
       # do disable on button down
       if b.type == ButtonType.cancel and b.pressed:
         events.add(EventName.buttonCancel)
-      elif ret.cruiseState.enabled and not self.CS.out.cruiseState.enabled:
-        events.add(car.CarEvent.EventName.pcmEnable)  # cruse is enabled
-      elif (not ret.cruiseState.enabled) and (ret.vEgo > 2.0 or (self.CS.out.cruiseState.enabled and (not ret.standstill))):
-        events.add(car.CarEvent.EventName.pcmDisable)  # give up, too fast to resume
 
     ret.events = events.to_msg()
 
@@ -332,10 +343,6 @@ class CarInterface(CarInterfaceBase):
       # do disable on button down
       if b.type == ButtonType.cancel and b.pressed:
         events.add(EventName.buttonCancel)
-      elif ret.cruiseState.enabled and not self.CS.out.cruiseState.enabled:
-        events.add(car.CarEvent.EventName.pcmEnable)  # cruse is enabled
-      elif (not ret.cruiseState.enabled) and (ret.vEgo > 2.0 or (self.CS.out.cruiseState.enabled and (not ret.standstill))):
-        events.add(car.CarEvent.EventName.pcmDisable)  # give up, too fast to resume
 
     ret.events = events.to_msg()
 
