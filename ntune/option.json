@@ -1,9 +1,9 @@
 {
-  "autoEnable": 0.0,
-  "autoEnableSpeed": 0.0,
-  "autoCruiseSet": 0.0,
-  "autoCruiseSetDependsOnNda": 0.0,
-  "batteryChargingControl": 0.0,
-  "batteryChargingMin": 70.0,
-  "batteryChargingMax": 80.0
+    "autoEnable": 0.0,
+    "autoEnableSpeed": 0.0,
+    "autoCruiseSet": 0.0,
+    "autoCruiseSetDependsOnNda": 0.0,
+    "batteryChargingControl": 1,
+    "batteryChargingMin": 70.0,
+    "batteryChargingMax": 80.0
 }

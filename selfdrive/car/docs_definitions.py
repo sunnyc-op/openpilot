@@ -19,6 +19,7 @@ class Column(Enum):
   FSR_LONGITUDINAL = "Stop and Go"
   FSR_STEERING = "Steer to 0"
   STEERING_TORQUE = "Steering Torque"
+  AUTO_RESUME = "Resume from stop"
   MAINTAINED = "Actively Maintained"
 
 
@@ -77,6 +78,7 @@ class CarInfo:
       Column.FSR_LONGITUDINAL: min_enable_speed <= 0.,
       Column.FSR_STEERING: min_steer_speed <= 0.,
       Column.STEERING_TORQUE: self.good_torque,
+      Column.AUTO_RESUME: Star.FULL if CP.autoResumeSng else Star.EMPTY,
       Column.MAINTAINED: CP.carFingerprint not in non_tested_cars  #and self.harness is not Harness.none,
     }
 

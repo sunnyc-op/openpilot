@@ -198,7 +198,7 @@ class PowerMonitoring:
 
     now = sec_since_boot()
     panda_charging = (peripheralState.usbPowerMode != log.PeripheralState.UsbPowerMode.client)
-    BATT_PERC_OFF = 10
+    BATT_PERC_OFF = 101
 
     should_shutdown = False
     # Wait until we have shut down charging before powering down

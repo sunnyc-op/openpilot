@@ -154,7 +154,7 @@ void Sidebar::paintEvent(QPaintEvent *event) {
   snprintf(battery_str, sizeof(battery_str), "%d%%", m_batteryPercent);
   p.drawText(bt, Qt::AlignLeft, battery_str);
 
-  const QRect temp = QRect(30, 367, 240, 50);
+  const QRect temp = QRect(40, 367, 240, 50);
   snprintf(temp_str, sizeof(temp_str), "%.1f%s", m_ambientTemp, "°C");
   p.drawText(temp, Qt::AlignCenter, temp_str);
   // metrics

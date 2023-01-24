@@ -266,6 +266,8 @@ struct GpsLocationData {
   # Represents velocity accuracy in m/s. (presumably 1 sigma?)
   speedAccuracy @12 :Float32;
 
+  unixTimestampMillis @13 :Int64;
+
   enum SensorSource {
     android @0;
     iOS @1;
@@ -773,6 +775,9 @@ struct ModelDataV2 {
   leads @11 :List(LeadDataV2);
   leadsV3 @18 :List(LeadDataV3);
 
+  # predicted stop line
+  stopLine @21 :StopLineData;
+
   meta @12 :MetaData;
 
   # All SI units and in device frame
@@ -815,6 +820,28 @@ struct ModelDataV2 {
     aStd @10 :List(Float32);
   }
 
+  struct StopLineData {
+    prob @0 :Float32;
+
+    x @1 :Float32;
+    xStd @2 :Float32;
+    y @3 :Float32;
+    yStd @4 :Float32;
+    z @5 :Float32;
+    zStd @6 :Float32;
+
+    roll @7 :Float32;
+    rollStd @8 :Float32;
+    pitch @9 :Float32;
+    pitchStd @10 :Float32;
+    yaw @11 :Float32;
+    yawStd @12 :Float32;
+
+    speedAtLine @13 :Float32;
+    speedAtLineStd @14 :Float32;
+    secondsUntilLine @15 :Float32;
+    secondsUntilLineStd @16 :Float32;
+  }
 
   struct MetaData {
     engagedProb @0 :Float32;
@@ -889,12 +916,31 @@ struct LongitudinalPlan @0xe00b5b3eba12876c {
 
   solverExecutionTime @35 :Float32;
 
+  # sunny
+  visionTurnControllerState @36 :VisionTurnControllerState;
+  visionTurnSpeed @37 :Float32;
+  stopLine @38 :List(Float64) = [0.];
+  stoplineProb @39 :Float32;
+  trafficState @40 : Int32;
+  e2eX @41 :List(Float64) = [0.];
+  lead0Obstacle @42 :List(Float64) = [0.];
+  lead1Obstacle @43 :List(Float64) = [0.];
+  cruiseTarget @44 :List(Float64) = [0.];
+  onStop @45 : Bool;
+  xStop @46 : Float32;
+  xState @47 : Text;
+
   enum LongitudinalPlanSource {
     cruise @0;
     lead0 @1;
     lead1 @2;
     lead2 @3;
     e2e @4;
+    # sunny
+    turn @5;
+    limit @6;
+    turnlimit @7;
+    stop @8;
   }
 
   # deprecated
@@ -930,6 +976,12 @@ struct LongitudinalPlan @0xe00b5b3eba12876c {
     x @0 :List(Float32);
     y @1 :List(Float32);
   }
+  enum VisionTurnControllerState {
+    disabled @0; # No predicted substancial turn on vision range or feature disabled.
+    entering @1; # A subsantial turn is predicted ahead, adapting speed to turn confort levels.
+    turning @2; # Actively turning. Managing acceleration to provide a roll on turn feeling.
+    leaving @3; # Road ahead straightens. Start to allow positive acceleration.
+  }
 }
 
 struct LateralPlan @0xe1e9318e2ae8b51e {
@@ -939,6 +991,10 @@ struct LateralPlan @0xe1e9318e2ae8b51e {
   rProb @7 :Float32;
   dPathPoints @20 :List(Float32);
   dProb @21 :Float32;
+
+  #dp
+  dPathWLinesX @33 :List(Float32);
+  dPathWLinesY @34 :List(Float32);
 
   mpcSolutionValid @9 :Bool;
   desire @17 :Desire;
@@ -1734,6 +1790,29 @@ struct CameraOdometry {
   rotStd @3 :List(Float32); # std rad/s in device frame
 }
 
+struct LiveMapData {
+  speedLimitValid @0 :Bool;
+  speedLimit @1 :Float32;
+  speedLimitAheadValid @2 :Bool;
+  speedLimitAhead @3 :Float32;
+  speedLimitAheadDistance @4 :Float32;
+  turnSpeedLimitValid @5 :Bool;
+  turnSpeedLimit @6 :Float32;
+  turnSpeedLimitEndDistance @7 :Float32;
+  turnSpeedLimitSign @8 :Int16;
+  turnSpeedLimitsAhead @9 :List(Float32);
+  turnSpeedLimitsAheadDistances @10 :List(Float32);
+  turnSpeedLimitsAheadSigns @11 :List(Int16);
+  lastGpsTimestamp @12 :Int64;  # Milliseconds since January 1, 1970.
+  currentRoadName @13 :Text;
+  lastGpsLatitude @14 :Float64;
+  lastGpsLongitude @15 :Float64;
+  lastGpsSpeed @16 :Float32;
+  lastGpsBearingDeg @17 :Float32;
+  lastGpsAccuracy @18 :Float32;
+  lastGpsBearingAccuracyDeg @19 :Float32;
+}
+
 struct Sentinel {
   enum SentinelType {
     endOfSegment @0;
@@ -1886,6 +1965,9 @@ struct Event {
     roadEncodeData @86 :EncodeData;
     driverEncodeData @87 :EncodeData;
     wideRoadEncodeData @88 :EncodeData;
+
+    #dp
+    liveMapData @90: LiveMapData;
 
     # *********** legacy + deprecated ***********
     model @9 :Legacy.ModelData; # TODO: rename modelV2 and mark this as deprecated

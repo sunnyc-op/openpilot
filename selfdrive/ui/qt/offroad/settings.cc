@@ -1924,6 +1924,8 @@ CTorqueControlGroup::CTorqueControlGroup() : CGroupWidget( tr("Torque Control Op
   QVBoxLayout *pBoxLayout = CreateBoxLayout();
 
   pBoxLayout->addWidget(new SRBaseControl());
+  pBoxLayout->addWidget(new SRMaxControl());
+  pBoxLayout->addWidget(new LiveSteerRatioToggle());
   pBoxLayout->addWidget(new TorqueMaxLatAccel());
   pBoxLayout->addWidget(new TorqueFriction());
   pBoxLayout->addWidget(new UseLiveTorqueToggle());
@@ -2026,6 +2028,21 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
     toggleLayout->addWidget(horizontal_line());
     toggleLayout->addWidget(new SteerLimitTimer());
   }
+  toggles.append(new ParamControl("UseClusterSpeed",
+                                            "Use Cluster Speed",
+                                            "Use cluster speed instead of wheel speed.",
+                                            "../assets/offroad/icon_road.png",
+                                            this));
+  toggles.append(new ParamControl("LongControlEnabled",
+                                            "Enable Long Control",
+                                            "Openpilot will control the speed of your car",
+                                            "../assets/offroad/icon_road.png",
+                                            this));
+  toggles.append(new ParamControl("TurnVisionControl",
+                                  "Enable vision based turn control",
+                                  "Use vision path predictions to estimate the appropiate speed to drive through turns ahead.",
+                                  "../assets/offroad/icon_road.png",
+                                  this));                                            
   toggles.append(new ParamControl("DisableOpFcw",
                                             "Disable Openpilot FCW",
                                             "",
@@ -2034,6 +2051,12 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 
   toggles.append(new ParamControl("ShowDebugUI",
                                             "Show Debug UI",
+                                            "",
+                                            "../assets/offroad/icon_shell.png",
+                                            this));
+
+  toggles.append(new ParamControl("ShowTrafficSignal",
+                                            "Show Traffic Signal",
                                             "",
                                             "../assets/offroad/icon_shell.png",
                                             this));
@@ -2067,6 +2090,7 @@ CommunityPanel::CommunityPanel(QWidget* parent) : QWidget(parent) {
 //  toggleLayout->addWidget(new OPKRServerAPI());
   toggleLayout->addWidget(horizontal_line());
   toggleLayout->addWidget(new TimeZoneSelectCombo());
+  toggleLayout->addWidget(new DepartChimeAtResume());
 }
 LateralControl::LateralControl(QWidget* parent): QWidget(parent) {
 

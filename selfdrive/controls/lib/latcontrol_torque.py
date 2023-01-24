@@ -25,6 +25,7 @@ class LatControlTorque(LatControl):
   def __init__(self, CP, CI):
     super().__init__(CP, CI)
     self.pid = PIDController(CP.lateralTuning.torque.kp, CP.lateralTuning.torque.ki,
+                             k_d=CP.lateralTuning.torque.kd,
                              k_f=CP.lateralTuning.torque.kf, pos_limit=self.steer_max, neg_limit=-self.steer_max)
     self.torque_from_lateral_accel = CI.torque_from_lateral_accel()
     self.use_steering_angle = CP.lateralTuning.torque.useSteeringAngle
@@ -69,9 +70,9 @@ class LatControlTorque(LatControl):
       if isLowSpeed:
         #low_speed_factor = interp(CS.vEgo, [0, 10, 20], [100, 75, 75])
         #low_speed_factor = interp(CS.vEgo, [0, 15], [500, 0]) # comma 1st
-        low_speed_factor = interp(CS.vEgo, [0, 10, 20], [500, 500, 200]) # comma 2nd
+        low_speed_factor = interp(CS.vEgo, [10., 25.], [80., 50.]) # from Tw
       else:
-        low_speed_factor = interp(CS.vEgo, [0, 5], [300, 0])
+        low_speed_factor = interp(CS.vEgo, [0, 10, 20], [500, 500, 200]) #from Telly
 
       setpoint = desired_lateral_accel + low_speed_factor * desired_curvature
       measurement = actual_lateral_accel + low_speed_factor * actual_curvature

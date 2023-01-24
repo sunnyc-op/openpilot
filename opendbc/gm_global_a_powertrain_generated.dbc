@@ -156,8 +156,11 @@ BO_ 452 AcceleratorPedal2: 8 XXX
 BO_ 481 ASCMSteeringButton: 7 K124_ASCM
  SG_ DistanceButton : 22|1@0+ (1,0) [0|0] ""  NEO
  SG_ LKAButton : 23|1@0+ (1,0) [0|0] ""  NEO
+ SG_ ACCAlwaysOne : 24|1@0+ (1,0) [0|1] "" XXX
  SG_ ACCButtons : 46|3@0+ (1,0) [0|0] ""  NEO
  SG_ DriveModeButton : 39|1@0+ (1,0) [0|1] "" XXX
+ SG_ RollingCounter : 33|2@0+ (1,0) [0|3] "" NEO
+ SG_ SteeringButtonChecksum : 43|12@0+ (1,0) [0|255] "" NEO
 
 BO_ 485 PSCMSteeringAngle: 8 K43_PSCM
  SG_ SteeringWheelAngle : 15|16@0- (0.0625,0) [-2047|2047] "deg"  NEO
@@ -227,6 +230,7 @@ BO_ 842 EBCMWheelSpdRear: 5 K17_EBCM
 BO_ 869 ASCM_365: 4 K124_ASCM
 
 BO_ 880 ASCMActiveCruiseControlStatus: 6 K124_ASCM
+ SG_ RollingCounter : 33|2@0+ (1,0) [0|3] ""  NEO
  SG_ ACCLeadCar : 44|1@0+ (1,0) [0|0] "" Vector__XXX
  SG_ ACCAlwaysOne2 : 32|1@0+ (1,0) [0|0] "" Vector__XXX
  SG_ ACCAlwaysOne : 0|1@0+ (1,0) [0|0] "" Vector__XXX

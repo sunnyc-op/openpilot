@@ -1,11 +1,28 @@
 from selfdrive.car import make_can_msg
+from selfdrive.car.gm.values import CAR
 
 def create_buttons(packer, bus, idx, button):
   values = {
     "ACCButtons": button,
     "RollingCounter": idx,
+    "ACCAlwaysOne": 1,
+    "DistanceButton": 0,
   }
+
+  checksum = 240 + int(values["ACCAlwaysOne"] * 0xf)
+  checksum += values["RollingCounter"] * (0x4ef if values["ACCAlwaysOne"] != 0 else 0x3f0)
+  checksum -= int(values["ACCButtons"] - 1) << 4  # not correct if value is 0
+  checksum -= 2 * values["DistanceButton"]
+
+  values["SteeringButtonChecksum"] = checksum
   return packer.make_can_msg("ASCMSteeringButton", bus, values)
+
+def create_resume_button(packer, bus, idx, button, value):
+  values = {
+    button: value,
+    "RollingCounter": idx,
+  }
+  return packer.make_can_msg("ASCMActiveCruiseControlStatus", bus, values)
 
 def create_steering_control(packer, bus, apply_steer, idx, lkas_active):
 
@@ -32,6 +49,20 @@ def create_gas_regen_command(packer, bus, throttle, idx, acc_engaged, at_full_st
     "GasRegenAlwaysOne": 1,
     "GasRegenAlwaysOne2": 1,
     "GasRegenAlwaysOne3": 1,
+  }
+
+  dat = packer.make_can_msg("ASCMGasRegenCmd", bus, values)[2]
+  values["GasRegenChecksum"] = (((0xff - dat[1]) & 0xff) << 16) | \
+                               (((0xff - dat[2]) & 0xff) << 8) | \
+                               ((0x100 - dat[3] - idx) & 0xff)
+
+  return packer.make_can_msg("ASCMGasRegenCmd", bus, values)
+
+
+def create_accel_command(packer, bus, idx, throttle):
+  values = {
+    "RollingCounter": idx,
+    "GasRegenCmd": throttle,
   }
 
   dat = packer.make_can_msg("ASCMGasRegenCmd", bus, values)[2]

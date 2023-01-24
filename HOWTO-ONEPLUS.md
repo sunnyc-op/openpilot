@@ -27,7 +27,7 @@
  콤마 로고 스피너가 나오면 오파 설치가 시작됩니다.
  
  continue setup -> custom setup -> wifie설정->continue->URL에서 아래 주소를 적어줍니다.
- https://smiskol.com/fork/kan-sky/twilsonco
+ https://smiskol.com/fork/sunnyc-op/voltpilot
  
  현브렌치 오파가 설치되고 5분 정도의 오파설치 과정을 거치면 드디어 현브렌치 빌드가 됩니다.
  상당히 긴 시간이 소요되고 오파 트레이닝 과정을 거쳐 설치가 완료됩니다.

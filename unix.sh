@@ -6,6 +6,7 @@
   chmod 700 ./tune.py
   chmod 700 ./scripts/*.sh
   chmod 700 ./launch_chffrplus.sh
+  chmod 700 ./launch_openpilot.sh
   sed -i -e 's/\r$//' ./*.py
   sed -i -e 's/\r$//' ./selfdrive/*.py
   sed -i -e 's/\r$//' ./selfdrive/manager/*.py
