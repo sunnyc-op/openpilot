@@ -142,7 +142,7 @@ function launch {
   
   dongleid=`cat /data/params/d/DongleId`
 
-  if [[ $dongleid == *"Unregistered"* ]]; then
+  if [[ $dongleid == *"maintenance"* ]]; then
     echo -en "000000" > /data/params/d/DongleId
   fi
 
