@@ -126,6 +126,7 @@ function launch {
   fi
   
   python ./selfdrive/car/hyundai/values.py > /data/params/d/SupportedCars
+  python ./selfdrive/car/gm/values.py > /data/params/d/SupportedCars_gm
   
   dongleid=`cat /data/params/d/DongleId`
 
