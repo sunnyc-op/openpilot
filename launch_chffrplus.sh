@@ -125,8 +125,9 @@ function launch {
     python /data/openpilot/common/spinner.py &
   fi
   
-  python ./selfdrive/car/hyundai/values.py > /data/params/d/SupportedCars
+  #python ./selfdrive/car/hyundai/values.py > /data/params/d/SupportedCars
   python ./selfdrive/car/gm/values.py > /data/params/d/SupportedCars_gm
+  python ./selfdrive/car/gm/values.py > /data/params/d/SupportedCars
   
   dongleid=`cat /data/params/d/DongleId`
 
